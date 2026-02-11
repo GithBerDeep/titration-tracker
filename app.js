@@ -105,6 +105,12 @@ function readCommonFields(){
   };
 }
 
+function readDraftFromUI(){
+  const d = getDraftOrNew();
+  const common = readCommonFields();
+  return { ...d, ...common };
+}
+
 function applyCommonFields(obj){
   $("medication").value = obj.medication || "";
   $("doseMg").value = (obj.doseMg ?? "");
@@ -163,6 +169,9 @@ async function renderHistory(){
         if (confirm("Supprimer cette entrée ?")){
           await deleteEntry(id);
           await renderHistory();
+    await refreshRecents();
+          await refreshRecents();
+  await refreshRecents();
         }
       } else if (action === "edit"){
         const entry = await getEntry(id);
@@ -182,6 +191,69 @@ function escapeHtml(s){
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
   }[c]));
+}
+
+const MAX_RECENT_MED = 8;
+const MAX_RECENT_DOSE = 8;
+
+function normalizeMed(s){
+  return String(s || "").trim().replace(/\s+/g," ");
+}
+
+function normalizeDose(v){
+  const n = Number(v);
+  if (!isFinite(n) || n <= 0) return null;
+  // keep .5 steps nicely
+  const r = Math.round(n * 2) / 2;
+  return r;
+}
+
+function uniqueRecent(list){
+  const seen = new Set();
+  const out = [];
+  for (const x of list){
+    const key = String(x).toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(x);
+  }
+  return out;
+}
+
+function renderChips(containerId, items, onPick){
+  const root = $(containerId);
+  if (!root) return;
+  if (!items.length){
+    root.innerHTML = "";
+    return;
+  }
+  root.innerHTML = items.map(v => `<button type="button" class="chip" data-v="${escapeHtml(v)}">${escapeHtml(v)}</button>`).join("");
+  root.querySelectorAll("button[data-v]").forEach(b => {
+    b.addEventListener("click", () => onPick(b.dataset.v));
+  });
+}
+
+function renderDatalist(listId, items){
+  const dl = $(listId);
+  if (!dl) return;
+  dl.innerHTML = items.map(v => `<option value="${escapeHtml(v)}"></option>`).join("");
+}
+
+async function refreshRecents(){
+  const entries = await getAllEntries();
+  // Newest first (takenAt desc)
+  entries.sort((a,b) => (b.takenAt || "").localeCompare(a.takenAt || ""));
+  const meds = uniqueRecent(entries.map(e => normalizeMed(e.medication)).filter(Boolean)).slice(0, MAX_RECENT_MED);
+  const doses = uniqueRecent(entries.map(e => {
+    const d = normalizeDose(e.doseMg);
+    return d != null ? String(d) : "";
+  }).filter(Boolean)).slice(0, MAX_RECENT_DOSE);
+
+  renderDatalist("medList", meds);
+  renderDatalist("doseList", doses);
+
+  renderChips("medChips", meds.slice(0,6), (v) => { $("medication").value = v; saveDraft(readDraftFromUI()); });
+  renderChips("doseChips", doses.slice(0,6), (v) => { $("doseMg").value = v; saveDraft(readDraftFromUI()); });
 }
 
 function getDraftOrNew(){
@@ -238,18 +310,42 @@ async function finalizeDraft(){
   clearDraft();
   updateDraftUI(getDraftOrNew());
   await renderHistory();
+  await refreshRecents();
   setStatus("Entrée enregistrée.");
+}
+
+
+function isoToParts(iso){
+  if (!iso) return { date:"", time:"" };
+  // Expect YYYY-MM-DDTHH:MM:SS±HH:MM
+  const m = String(iso).match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+  if (!m) return { date:"", time:"" };
+  return { date: m[1], time: m[2] };
+}
+
+function buildFxCheckboxes(prefix, selected){
+  const opts = [
+    { id:"appetite_low", label:"Appétit coupé" },
+    { id:"anxiety_irritability", label:"Anxiété / irritabilité" },
+    { id:"sleep_impact", label:"Sommeil impacté" }
+  ];
+  const set = new Set(selected || []);
+  return opts.map(o => `
+    <label><input type="checkbox" class="${prefix}_fx" value="${o.id}" ${set.has(o.id) ? "checked" : ""}> ${escapeHtml(o.label)}</label>
+  `).join("");
 }
 
 function openEditModal(entry){
   const modal = $("modal");
   const body = $("modalBody");
+  const t = isoToParts(entry.takenAt);
+  const e = isoToParts(entry.endAt);
   body.className = "modal-body";
   body.innerHTML = `
     <div class="grid2">
       <div class="form-group">
         <label>Médicament</label>
-        <input id="m_medication" type="text" value="${escapeHtml(entry.medication || "")}" />
+        <input id="m_medication" type="text" value="${escapeHtml(entry.medication || "")}" list="medList" />
       </div>
       <div class="form-group">
         <label>Dose (mg)</label>
@@ -274,29 +370,42 @@ function openEditModal(entry){
 
     <div class="grid2">
       <div class="form-group">
-        <label>Prise (ISO)</label>
-        <input id="m_takenAt" type="text" value="${escapeHtml(entry.takenAt || "")}" />
+        <label>Prise (date)</label>
+        <input id="m_takenDate" type="date" value="${escapeHtml(t.date)}" />
       </div>
       <div class="form-group">
-        <label>Fin (ISO)</label>
-        <input id="m_endAt" type="text" value="${escapeHtml(entry.endAt || "")}" />
+        <label>Prise (heure)</label>
+        <input id="m_takenTime" type="time" value="${escapeHtml(t.time)}" />
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="form-group">
+        <label>Fin (date)</label>
+        <input id="m_endDate" type="date" value="${escapeHtml(e.date)}" />
+      </div>
+      <div class="form-group">
+        <label>Fin (heure)</label>
+        <input id="m_endTime" type="time" value="${escapeHtml(e.time)}" />
       </div>
     </div>
 
     <div class="grid2">
       <div class="form-group">
         <label>Efficacité (0–10)</label>
-        <input id="m_benefit" type="number" min="0" max="10" value="${clampInt(entry.benefit ?? 0,0,10)}" />
+        <input id="m_benefit" type="range" min="0" max="10" value="${clampInt(entry.benefit ?? 0,0,10)}" />
+        <div class="small">Valeur: <span id="m_benefitVal">${clampInt(entry.benefit ?? 0,0,10)}</span></div>
       </div>
       <div class="form-group">
         <label>Crash (0–10)</label>
-        <input id="m_crash" type="number" min="0" max="10" value="${clampInt(entry.crash ?? 0,0,10)}" />
+        <input id="m_crash" type="range" min="0" max="10" value="${clampInt(entry.crash ?? 0,0,10)}" />
+        <div class="small">Valeur: <span id="m_crashVal">${clampInt(entry.crash ?? 0,0,10)}</span></div>
       </div>
     </div>
 
     <div class="form-group">
-      <label>Effets (codes séparés par virgules)</label>
-      <input id="m_fx" type="text" value="${escapeHtml((entry.sideEffects || []).join(","))}" placeholder="appetite_low,anxiety_irritability" />
+      <div class="effects-title">Effets (optionnel)</div>
+      ${buildFxCheckboxes("m", entry.sideEffects || [])}
     </div>
 
     <div class="form-group">
@@ -308,36 +417,66 @@ function openEditModal(entry){
       <button id="m_save" class="primary">Enregistrer</button>
       <button id="m_cancel" class="secondary">Annuler</button>
     </div>
-
-    <div class="small">
-      Astuce: si tu veux une UI “date/heure” pour l’édition, on la fera ensuite. Là c’est le P0 robuste.
-    </div>
   `;
   body.querySelector("#m_form").value = entry.form || "unknown";
+
+  const updateVals = () => {
+    $("m_benefitVal").textContent = String($("m_benefit").value);
+    $("m_crashVal").textContent = String($("m_crash").value);
+  };
+  $("m_benefit").addEventListener("input", updateVals);
+  $("m_crash").addEventListener("input", updateVals);
+  updateVals();
 
   modal.classList.remove("hidden");
 
   const close = () => modal.classList.add("hidden");
   $("modalClose").onclick = close;
-  body.querySelector("#m_cancel").onclick = close;
 
-  body.querySelector("#m_save").onclick = async () => {
+  $("m_cancel").onclick = close;
+
+  $("m_save").onclick = async () => {
+    const medication = normalizeMed($("m_medication").value);
+    const doseMg = normalizeDose($("m_doseMg").value);
+    const form = $("m_form").value || "unknown";
+
+    const takenDate = $("m_takenDate").value;
+    const takenTime = $("m_takenTime").value;
+    const endDate = $("m_endDate").value;
+    const endTime = $("m_endTime").value;
+
+    const takenAt = (takenDate && takenTime) ? toLocalISOString(new Date(
+      Number(takenDate.slice(0,4)), Number(takenDate.slice(5,7))-1, Number(takenDate.slice(8,10)),
+      Number(takenTime.slice(0,2)), Number(takenTime.slice(3,5)), 0
+    )) : null;
+
+    const endAt = (endDate && endTime) ? toLocalISOString(new Date(
+      Number(endDate.slice(0,4)), Number(endDate.slice(5,7))-1, Number(endDate.slice(8,10)),
+      Number(endTime.slice(0,2)), Number(endTime.slice(3,5)), 0
+    )) : null;
+
+    const benefit = clampInt($("m_benefit").value, 0, 10);
+    const crash = clampInt($("m_crash").value, 0, 10);
+    const sideEffects = Array.from(body.querySelectorAll("input.m_fx:checked")).map(x => x.value);
+
     const updated = {
       ...entry,
-      medication: body.querySelector("#m_medication").value.trim(),
-      doseMg: Number(body.querySelector("#m_doseMg").value || 0),
-      form: body.querySelector("#m_form").value,
-      takenAt: body.querySelector("#m_takenAt").value.trim() || null,
-      endAt: body.querySelector("#m_endAt").value.trim() || null,
-      benefit: clampInt(body.querySelector("#m_benefit").value, 0, 10),
-      crash: clampInt(body.querySelector("#m_crash").value, 0, 10),
-      sideEffects: (body.querySelector("#m_fx").value || "").split(",").map(s => s.trim()).filter(Boolean),
-      notes: body.querySelector("#m_notes").value.trim()
+      medication,
+      doseMg,
+      form,
+      takenAt,
+      endAt,
+      durationMin: (takenAt && endAt) ? minutesBetween(takenAt, endAt) : null,
+      benefit,
+      crash,
+      sideEffects,
+      notes: $("m_notes").value || ""
     };
-    updated.durationMin = (updated.takenAt && updated.endAt) ? minutesBetween(updated.takenAt, updated.endAt) : null;
+
     await putEntry(updated);
-    close();
     await renderHistory();
+    await refreshRecents();
+    close();
   };
 }
 
@@ -411,6 +550,46 @@ function groupByDose(entries){
     map.get(key).push(e);
   }
   return map;
+}
+
+
+function buildMiniGraphSVG(rows){
+  // Scatter: x=durée (h), y=crash (0-10). Only include rows with durationMin and crash.
+  const pts = rows.filter(r => r.durationMin != null && r.crash != null).map(r => ({
+    x: Math.max(0, Math.min(16, r.durationMin / 60)),
+    y: Math.max(0, Math.min(10, Number(r.crash)))
+  }));
+  if (!pts.length) return "<div class='small'>Aucun point exploitable pour le graphe.</div>";
+
+  const W = 680, H = 200;
+  const padL = 40, padR = 10, padT = 10, padB = 28;
+  const iw = W - padL - padR;
+  const ih = H - padT - padB;
+
+  const xTo = (x) => padL + (x/16) * iw;
+  const yTo = (y) => padT + (1 - (y/10)) * ih;
+
+  // Simple grid lines
+  const gridX = [0,4,8,12,16].map(v => `<line x1="${xTo(v)}" y1="${padT}" x2="${xTo(v)}" y2="${padT+ih}" stroke="#e2e8f0" />`).join("");
+  const gridY = [0,2,4,6,8,10].map(v => `<line x1="${padL}" y1="${yTo(v)}" x2="${padL+iw}" y2="${yTo(v)}" stroke="#e2e8f0" />`).join("");
+
+  const dots = pts.map(p => `<circle cx="${xTo(p.x)}" cy="${yTo(p.y)}" r="3" fill="#0f172a" />`).join("");
+
+  const labelsX = [0,4,8,12,16].map(v => `<text x="${xTo(v)}" y="${padT+ih+18}" text-anchor="middle" font-size="10" fill="#334155">${v}</text>`).join("");
+  const labelsY = [0,5,10].map(v => `<text x="${padL-8}" y="${yTo(v)+3}" text-anchor="end" font-size="10" fill="#334155">${v}</text>`).join("");
+
+  return `
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Graphe durée vs crash">
+      <rect x="0" y="0" width="${W}" height="${H}" fill="#ffffff" />
+      ${gridX}${gridY}
+      <line x1="${padL}" y1="${padT+ih}" x2="${padL+iw}" y2="${padT+ih}" stroke="#94a3b8"/>
+      <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+ih}" stroke="#94a3b8"/>
+      ${dots}
+      ${labelsX}${labelsY}
+      <text x="${padL+iw/2}" y="${H-6}" text-anchor="middle" font-size="11" fill="#0f172a">Durée (heures)</text>
+      <text x="12" y="${padT+ih/2}" text-anchor="middle" font-size="11" fill="#0f172a" transform="rotate(-90 12 ${padT+ih/2})">Crash (0–10)</text>
+    </svg>
+  `;
 }
 
 function buildPrintableReport(entries){
@@ -498,6 +677,12 @@ function buildPrintableReport(entries){
   </div>
 
   <div class="box">
+    <strong>Mini-graphe (durée vs crash)</strong>
+    <div class="small">Chaque point = une entrée avec durée calculée.</div>
+    ${buildMiniGraphSVG(rows)}
+  </div>
+
+  <div class="box">
     <strong>Chronologie</strong>
     <table>
       <thead>
@@ -543,6 +728,7 @@ async function importJSON(file){
   }));
   await bulkUpsert(cleaned);
   await renderHistory();
+  await refreshRecents();
   alert(`Import terminé: ${cleaned.length} entrées.`);
 }
 
@@ -637,6 +823,7 @@ function wireActions(){
 
     await putEntry(entry);
     await renderHistory();
+    await refreshRecents();
     setStatus("Entrée (rattrapage) enregistrée.");
   });
 

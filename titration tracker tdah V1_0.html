@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Titration TDAH</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #0ea5e9; /* Sky Blue */
+            --primary-dark: #0284c7;
+            --bg: #f0f9ff;
+            --surface: #ffffff;
+            --text: #0f172a;
+            --danger: #ef4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* HEADER */
+        header {
+            background-color: var(--surface);
+            padding: 15px 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+        h1 { margin: 0; font-size: 18px; font-weight: 800; color: var(--primary-dark); }
+        .btn-export {
+            font-size: 12px;
+            background: var(--bg);
+            color: var(--primary-dark);
+            border: 1px solid var(--primary);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* NAVIGATION TABS */
+        .tabs {
+            display: flex;
+            background: var(--surface);
+            padding: 0 10px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 15px 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #94a3b8;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+        }
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        /* MAIN CONTENT */
+        main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* FORM ELEMENTS */
+        .card {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+        
+        label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #475569; }
+        
+        select, input[type="number"], input[type="time"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 16px;
+            background: #f8fafc;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+        }
+
+        /* SLIDERS */
+        .slider-container { margin-bottom: 25px; }
+        .slider-header { display: flex; justify-content: space-between; margin-bottom: 5px; }
+        .slider-val { color: var(--primary); font-weight: bold; }
+        input[type=range] {
+            width: 100%;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 5px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px; height: 20px;
+            background: var(--primary);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        /* SIDE EFFECTS GRID */
+        .fx-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .fx-item {
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 13px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .fx-item.selected {
+            background-color: #fee2e2;
+            border-color: #fca5a5;
+            color: #b91c1c;
+            font-weight: bold;
+        }
+
+        /* ACTION BUTTON */
+        .btn-main {
+            width: 100%;
+            padding: 16px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+            transition: transform 0.1s;
+        }
+        .btn-main:active { transform: scale(0.98); }
+
+        /* HISTORY LIST */
+        .history-item {
+            border-left: 4px solid var(--primary);
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 0 8px 8px 0;
+            font-size: 14px;
+        }
+        .history-date { font-size: 12px; color: #94a3b8; margin-bottom: 4px; }
+        .history-details { display: flex; justify-content: space-between; font-weight: 500; }
+        .history-bad { color: var(--danger); font-size: 12px; margin-top: 5px; }
+
+        /* UTILS */
+        .hidden { display: none; }
+        
+        /* PRINT STYLES */
+        @media print {
+            body { background: white; height: auto; display: block; }
+            header, .tabs, .btn-main, #view-log { display: none; }
+            #view-stats { display: block !important; }
+            .card { box-shadow: none; border: 1px solid #ccc; }
+            canvas { max-height: 300px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>💊 Titration Tracker</h1>
+        <button class="btn-export" onclick="window.print()">🖨️ PDF Docteur</button>
+    </header>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('log')" id="tab-log">Saisie</div>
+        <div class="tab" onclick="switchTab('stats')" id="tab-stats">Bilan & Doc</div>
+    </div>
+
+    <main>
+        <div id="view-log">
+            
+            <div class="card">
+                <h3 style="margin-top:0">☀️ Prise du matin</h3>
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:2">
+                        <label>Médicament</label>
+                        <select id="inp-med">
+                            <option value="Ritaline LI">Ritaline (Immédiat)</option>
+                            <option value="Ritaline LP">Ritaline LP</option>
+                            <option value="Concerta">Concerta</option>
+                            <option value="Vyvanse">Elvanse/Vyvanse</option>
+                            <option value="Quasym">Quasym</option>
+                            <option value="Medikinet">Medikinet</option>
+                            <option value="Autre">Autre</option>
+                        </select>
+                    </div>
+                    <div style="flex:1">
+                        <label>Dose (mg)</label>
+                        <input type="number" id="inp-dose" value="10">
+                    </div>
+                </div>
+                <label>Heure de prise</label>
+                <input type="time" id="inp-time">
+            </div>
+
+            <div class="card">
+                <h3 style="margin-top:0">🌙 Bilan du soir</h3>
+                
+                <div class="slider-container">
+                    <div class="slider-header">
+                        <label>Durée ressentie (heures)</label>
+                        <span class="slider-val" id="val-duration">0h</span>
+                    </div>
+                    <input type="range" id="rng-duration" min="0" max="16" step="0.5" value="0" oninput="updateSliders()">
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-header">
+                        <label>Efficacité / Focus (1-10)</label>
+                        <span class="slider-val" id="val-focus">5/10</span>
+                    </div>
+                    <input type="range" id="rng-focus" min="1" max="10" value="5" oninput="updateSliders()">
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-header">
+                        <label>Crash / Descente (1-10)</label>
+                        <span class="slider-val" id="val-crash" style="color:var(--danger)">Non</span>
+                    </div>
+                    <input type="range" id="rng-crash" min="1" max="10" value="1" oninput="updateSliders()">
+                    <p style="font-size:11px; color:#94a3b8; margin-top:5px">1 = Rien, 10 = Irritable/Déprimé/Épuisé</p>
+                </div>
+
+                <label>Effets Secondaires (Sélectionner)</label>
+                <div class="fx-grid" id="fx-container">
+                    </div>
+            </div>
+
+            <button class="btn-main" onclick="saveData()">Enregistrer la journée</button>
+            <p id="save-msg" style="text-align:center; color:green; font-size:12px; margin-top:10px; opacity:0; transition:opacity 0.5s">Sauvegardé !</p>
+        </div>
+
+        <div id="view-stats" class="hidden">
+            <div class="card">
+                <h3>📈 Tendance (7 derniers logs)</h3>
+                <canvas id="myChart" height="200"></canvas>
+            </div>
+
+            <h3>Historique</h3>
+            <div id="history-list">
+                </div>
+            
+            <button onclick="clearData()" style="margin-top:30px; background:none; border:none; text-decoration:underline; color:#94a3b8; width:100%">Effacer toutes les données</button>
+        </div>
+    </main>
+
+    <script>
+        // CONFIG DATA
+        const SIDE_EFFECTS = [
+            "Perte d'appétit", "Bouche sèche", "Maux de tête", 
+            "Insomnie", "Anxiété", "Coeur rapide", 
+            "Irritabilité", "Maux de ventre"
+        ];
+        
+        // STATE
+        let selectedFx = new Set();
+
+        // INIT
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set default time to now
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('inp-time').value = `${hours}:${minutes}`;
+
+            // Render Side Effects
+            const fxContainer = document.getElementById('fx-container');
+            SIDE_EFFECTS.forEach(fx => {
+                const div = document.createElement('div');
+                div.className = 'fx-item';
+                div.innerText = fx;
+                div.onclick = () => toggleFx(div, fx);
+                fxContainer.appendChild(div);
+            });
+
+            loadData();
+        });
+
+        // UI LOGIC
+        function toggleFx(el, fx) {
+            if (selectedFx.has(fx)) {
+                selectedFx.delete(fx);
+                el.classList.remove('selected');
+            } else {
+                selectedFx.add(fx);
+                el.classList.add('selected');
+            }
+        }
+
+        function updateSliders() {
+            document.getElementById('val-duration').innerText = document.getElementById('rng-duration').value + 'h';
+            document.getElementById('val-focus').innerText = document.getElementById('rng-focus').value + '/10';
+            document.getElementById('val-crash').innerText = document.getElementById('rng-crash').value + '/10';
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            
+            document.getElementById('view-log').classList.add('hidden');
+            document.getElementById('view-stats').classList.add('hidden');
+            document.getElementById('view-' + tab).classList.remove('hidden');
+
+            if(tab === 'stats') renderStats();
+        }
+
+        // DATA LOGIC
+        function saveData() {
+            const log = {
+                id: Date.now(),
+                date: new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }),
+                timestamp: new Date().getTime(), // pour le tri
+                med: document.getElementById('inp-med').value,
+                dose: document.getElementById('inp-dose').value,
+                time: document.getElementById('inp-time').value,
+                duration: document.getElementById('rng-duration').value,
+                focus: document.getElementById('rng-focus').value,
+                crash: document.getElementById('rng-crash').value,
+                fx: Array.from(selectedFx)
+            };
+
+            let history = JSON.parse(localStorage.getItem('tdah_logs') || '[]');
+            history.unshift(log); // Ajouter au début
+            localStorage.setItem('tdah_logs', JSON.stringify(history));
+
+            // Feedback visuel
+            const msg = document.getElementById('save-msg');
+            msg.style.opacity = 1;
+            setTimeout(() => msg.style.opacity = 0, 2000);
+            
+            // Reset FX selection
+            selectedFx.clear();
+            document.querySelectorAll('.fx-item').forEach(el => el.classList.remove('selected'));
+        }
+
+        function loadData() {
+            // Just checking functionality
+        }
+
+        function renderStats() {
+            const logs = JSON.parse(localStorage.getItem('tdah_logs') || '[]');
+            const list = document.getElementById('history-list');
+            list.innerHTML = '';
+
+            if (logs.length === 0) {
+                list.innerHTML = '<p style="text-align:center; color:#94a3b8">Aucune donnée enregistrée.</p>';
+                return;
+            }
+
+            // Remplir la liste
+            logs.forEach(log => {
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                
+                let fxHtml = log.fx.length > 0 ? `<div class="history-bad">⚠️ ${log.fx.join(', ')}</div>` : '';
+                
+                item.innerHTML = `
+                    <div class="history-date">${log.date} à ${log.time}</div>
+                    <div class="history-details">
+                        <span>${log.med} ${log.dose}mg</span>
+                        <span>Durée: ${log.duration}h | Crash: ${log.crash}</span>
+                    </div>
+                    ${fxHtml}
+                `;
+                list.appendChild(item);
+            });
+
+            // Gérer le Graphique (Chart.js)
+            renderChart(logs);
+        }
+
+        let myChartInstance = null;
+
+        function renderChart(logs) {
+            const ctx = document.getElementById('myChart');
+            
+            // Préparer les données (inverser pour avoir l'ordre chronologique)
+            const dataLogs = [...logs].reverse().slice(-7); // 7 derniers jours
+            
+            const labels = dataLogs.map(l => l.date);
+            const dataDuration = dataLogs.map(l => l.duration);
+            const dataCrash = dataLogs.map(l => l.crash);
+
+            if (myChartInstance) {
+                myChartInstance.destroy();
+            }
+
+            myChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Durée (h)',
+                            data: dataDuration,
+                            borderColor: '#0ea5e9',
+                            backgroundColor: '#0ea5e9',
+                            yAxisID: 'y',
+                        },
+                        {
+                            label: 'Intensité Crash',
+                            data: dataCrash,
+                            borderColor: '#ef4444',
+                            backgroundColor: '#ef4444',
+                            yAxisID: 'y1',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        y: { type: 'linear', display: true, position: 'left', min:0, max:16 },
+                        y1: { type: 'linear', display: true, position: 'right', min:0, max:10, grid: { drawOnChartArea: false } }
+                    }
+                }
+            });
+        }
+
+        function clearData() {
+            if(confirm("Tout effacer ?")) {
+                localStorage.removeItem('tdah_logs');
+                renderStats();
+            }
+        }
+    </script>
+</body>
+</html>

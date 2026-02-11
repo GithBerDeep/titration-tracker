@@ -1,4 +1,4 @@
-const CACHE_NAME = "titration-tracker-pwa-v0.1.0";
+const CACHE_NAME = "titration-v0.2";
 const ASSETS = [
   "./",
   "./index.html",
