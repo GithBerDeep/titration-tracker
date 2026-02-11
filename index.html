@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#2563eb" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./assets/icon-192.png" />
+  <link rel="stylesheet" href="./styles.css" />
+  <title>Titration Tracker (PWA)</title>
+</head>
+<body>
+  <header>
+    <h1>Titration Tracker</h1>
+    <div class="sub">Local-first · Android/PC · Export médecin</div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Entrée du jour</h2>
+
+      <div class="grid2">
+        <div class="form-group">
+          <label for="medication">Médicament</label>
+          <input id="medication" type="text" placeholder="Ex: Méthylphénidate" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label for="doseMg">Dose (mg)</label>
+          <input id="doseMg" type="number" inputmode="decimal" min="0" step="0.5" placeholder="Ex: 10" />
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="form-group">
+          <label for="form">Forme</label>
+          <select id="form">
+            <option value="unknown">Non précisée</option>
+            <option value="IR">IR (libération immédiate)</option>
+            <option value="LP">LP (libération prolongée)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="date">Date</label>
+          <input id="date" type="date" />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="btnTakeNow" class="primary">Je prends maintenant</button>
+        <button id="btnEndNow" class="primary">L’effet s’arrête maintenant</button>
+      </div>
+
+      <details class="details">
+        <summary>J’ai oublié (rattrapage)</summary>
+        <div class="grid2">
+          <div class="form-group">
+            <label for="takeTime">Heure de prise</label>
+            <input id="takeTime" type="time" />
+          </div>
+          <div class="form-group">
+            <label for="endTime">Heure de fin d’effet</label>
+            <input id="endTime" type="time" />
+          </div>
+        </div>
+        <div class="actions">
+          <button id="btnSaveManual" class="secondary">Enregistrer (rattrapage)</button>
+        </div>
+        <div class="hint">Si l’heure de fin est avant l’heure de prise, on suppose le lendemain.</div>
+      </details>
+
+      <div id="liveStatus" class="status" aria-live="polite"></div>
+
+      <div class="grid2">
+        <div class="form-group">
+          <label for="benefit">Efficacité perçue (0–10) <span id="benefitVal" class="pill">—</span></label>
+          <input id="benefit" type="range" min="0" max="10" step="1" value="0" />
+        </div>
+        <div class="form-group">
+          <label for="crash">Redescente (0–10) <span id="crashVal" class="pill">—</span></label>
+          <input id="crash" type="range" min="0" max="10" step="1" value="0" />
+        </div>
+      </div>
+
+      <div class="effects">
+        <div class="effects-title">Effets (optionnel, 3 max conseillés)</div>
+        <label><input type="checkbox" value="appetite_low" class="fx"> Appétit coupé</label>
+        <label><input type="checkbox" value="anxiety_irritability" class="fx"> Anxiété / irritabilité</label>
+        <label><input type="checkbox" value="sleep_impact" class="fx"> Sommeil impacté</label>
+      </div>
+
+      <div class="form-group">
+        <label for="notes">Notes libres (optionnel)</label>
+        <textarea id="notes" rows="3" placeholder="Contexte, journée, alimentation, événements…"></textarea>
+      </div>
+
+      <div class="actions">
+        <button id="btnFinalize" class="primary">Finaliser l’entrée en cours</button>
+        <button id="btnClearDraft" class="danger">Effacer le brouillon</button>
+      </div>
+
+      <div class="small">Astuce: tu peux juste cliquer “Je prends maintenant” et revenir plus tard.</div>
+    </section>
+
+    <section class="card">
+      <h2>Exports</h2>
+      <div class="actions">
+        <button id="btnExportPDF" class="secondary">Rapport médecin (imprimer)</button>
+        <button id="btnExportCSV" class="secondary">Exporter CSV</button>
+        <button id="btnExportJSON" class="secondary">Exporter JSON</button>
+      </div>
+
+      <div class="import">
+        <label class="import-label">Importer JSON
+          <input id="importFile" type="file" accept="application/json" />
+        </label>
+        <button id="btnImport" class="secondary">Importer</button>
+      </div>
+
+      <div class="small">
+        Backup cloud sans serveur: exporte JSON et mets-le dans Google Drive (manuel) ou un dossier sync PC.
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Historique</h2>
+      <div id="history" class="history"></div>
+    </section>
+  </main>
+
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div id="modalTitle" class="modal-title">Modifier une entrée</div>
+        <button id="modalClose" class="iconbtn" aria-label="Fermer">✕</button>
+      </div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
