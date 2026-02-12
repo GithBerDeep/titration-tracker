@@ -1,4 +1,4 @@
-const CACHE_NAME = "titration-v0.2";
+const CACHE_NAME = "titration-v0.2.2";
 const ASSETS = [
   "./",
   "./index.html",

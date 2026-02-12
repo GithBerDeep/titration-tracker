@@ -1,6 +1,7 @@
 import { putEntry, deleteEntry, getAllEntries, getEntry, bulkUpsert } from "./db.js";
 
 const SCHEMA_VERSION = 2;
+const APP_VERSION = "0.2.2";
 const DRAFT_KEY = "tt_draft_v2";
 
 const $ = (id) => document.getElementById(id);
@@ -859,6 +860,8 @@ function wireActions(){
 async function boot(){
   initDate();
   initSliders();
+  const vEl = $("appVersion");
+  if (vEl) vEl.textContent = APP_VERSION;
   registerSW();
 
   const draft = getDraftOrNew();
