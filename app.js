@@ -864,6 +864,7 @@ async function boot(){
   const draft = getDraftOrNew();
   updateDraftUI(draft);
   await renderHistory();
+  await refreshRecents();
 
   // restore any draft fields (except timestamps which are stored too)
   const stored = loadDraft();
